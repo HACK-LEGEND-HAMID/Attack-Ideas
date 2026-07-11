@@ -158,23 +158,39 @@ Second, if the path is accessible, fetch the full content. For a directory like 
 
 Third, use what you find. A password from `.env` connects you to the database. An open `/admin/` panel gives you control. A `database.sql` file exposes every user record.
 
-### A Simple Checklist
-
-Found `/admin/`. Try to access it. Maybe it loads a login page. Maybe it loads the dashboard directly without asking for a password.
-
-Found `.env`. Download it. Look for DB_PASSWORD, API_KEY, SECRET, TOKEN.
-
-Found `config.php.bak`. Download it. Read the database credentials.
-
-Found `database.sql`. Download it. Import it locally. Browse every table.
-
-Found `.git/`. Clone the repository. Read the commit history. Find secrets that were committed and later removed.
-
-Found `robots.txt`. Read it carefully. Visit every path listed under Disallow. Those are the paths the owner never wanted you to see.
-
 ### What Hurts The Most
 
 An exposed `.env` file is critical because it gives database access. A downloadable `database.sql` file is critical because it exposes every user's data. An accessible `.git` folder is critical because it reveals the complete source code. An open `/admin/` panel is highly dangerous because it hands over website control. A browsable `/backup/` folder is dangerous because old files contain unfixed vulnerabilities.
 This was just the first command. No flags. No tricks. Just `curl`.
 There is a lot more to learn. Headers. Cookies. Sending data. Faking your identity. Every flag does something different.
 Keep going. The good stuff is next.
+
+## Extract Information Faster With grep
+
+Running `curl` gives you the entire source code. But reading thousands of lines is slow. You need to extract only what matters. That is where `grep` comes in.
+
+`grep` is a search tool. You give it a pattern, it finds every line that matches. Combine it with `curl` and you get exactly what you need in seconds.
+
+### The Basic Formula
+
+You pipe the output of `curl` into `grep`. The pipe symbol `|` takes the output of one command and feeds it into another.
+
+### Find Every Comment On The Page
+
+Comments hide developer notes, old code, and sometimes passwords.
+
+```bash
+curl -s https://target.com | grep -E '<!--'
+```
+| What You Want | Copy And Paste This Command |
+|---------------|------------------------------|
+| **Comments** | `curl -s https://target.com \| grep -E '<!--'` |
+| **All links** | `curl -s https://target.com \| grep -oP 'href="[^"]*"'` |
+| **JavaScript files** | `curl -s https://target.com \| grep -oP 'src="[^"]*\.js"'` |
+| **CSS files** | `curl -s https://target.com \| grep -oP 'href="[^"]*\.css"'` |
+| **Images** | `curl -s https://target.com \| grep -oP 'src="[^"]*\.(png\|jpg\|svg)"'` |
+| **Emails** | `curl -s https://target.com \| grep -oP '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'` |
+| **API paths** | `curl -s https://target.com \| grep -oP '"/api/[^"]*"'` |
+| **Everything at once** | `curl -s https://target.com \| grep -E '<!--\|href=\|src=\|@\|/api/'` |
+
+Just replace `https://target.com` with your actual target and run the command.
