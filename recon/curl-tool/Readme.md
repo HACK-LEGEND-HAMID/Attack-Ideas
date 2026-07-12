@@ -1,4 +1,8 @@
-# CURL. The Hacker's First Recon Tool.
+<p align="center">
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=40&duration=3000&pause=1000&color=00FF00&center=true&vCenter=true&width=900&lines=CURL.;The+Hacker's+First+Recon+Tool.;The+Silent+Spy+of+Terminal.;Learn.+Extract.+Recon.+Repeat." alt="CURL Typing Animation" />
+</p>
+
+---
 
 Every hacker starts somewhere. Most start right here, with CURL.
 
@@ -194,3 +198,125 @@ curl -s https://target.com | grep -E '<!--'
 | **Everything at once** | `curl -s https://target.com \| grep -E '<!--\|href=\|src=\|@\|/api/'` |
 
 Just replace `https://target.com` with your actual target and run the command.
+
+# curl -I. The Silent Spy.
+
+`curl -I` is a reconnaissance command. It asks the server one question. "Tell me about this page." The server responds with headers. Just headers. No body content. No HTML. No images.
+
+Think of it like standing outside a building and reading the sign on the door. You learn who owns it, what is inside, and how secure it is. All without stepping in.
+
+---
+
+## The Response. What You Get.
+
+When you run `curl -I https://target.com`, the server sends back a list of headers. Each header reveals something specific.
+
+### Status Code
+
+The first line tells you if the page is alive or dead.
+
+| Code | Meaning | What You Should Do |
+|------|---------|---------------------|
+| 200 | Page exists and is accessible | Proceed. Download the full page. |
+| 301 | Permanent redirect | Check the Location header for the new URL. |
+| 302 | Temporary redirect | Same as above. Follow the trail. |
+| 401 | Authentication required | The page is protected. Look for login bypass. |
+| 403 | Forbidden | The page exists but you cannot access it. Try path traversal. |
+| 404 | Not found | Nothing here. Move on to the next path. |
+| 500 | Internal server error | The server is broken. This is interesting. Errors leak information. |
+
+### Server Information
+
+These headers tell you exactly what software is running.
+
+The `Server` header reveals the web server type. Apache, Nginx, IIS, Cloudflare. Sometimes it includes the exact version number. Old versions have known vulnerabilities. Apache 2.4.49 is vulnerable to path traversal. Nginx 1.16 has HTTP request smuggling issues.
+
+The `X-Powered-By` header reveals the programming language and version. PHP 7.4.33 means the server runs a version of PHP that stopped receiving security updates in November 2022. ASP.NET 4.5 means the server runs on Windows. Node.js means JavaScript on the backend.
+
+### Cookies
+
+The `Set-Cookie` header shows you how sessions are managed.
+
+The cookie name tells you what framework the site uses. PHPSESSID means PHP. JSESSIONID means Java. ASP.NET_SessionId means ASP.NET.
+
+The flags on the cookie tell you how secure it is. If `HttpOnly` is missing, JavaScript can read the cookie. If `Secure` is missing, the cookie travels over unencrypted connections. If `SameSite` is set to None, CSRF attacks are possible.
+
+### Security Headers
+
+These headers tell you how well the site is defended.
+
+`Strict-Transport-Security` means the site forces HTTPS. If this header is missing, SSL stripping attacks might work.
+
+`X-Frame-Options` prevents the page from being loaded in an iframe. If this header is missing, clickjacking attacks are possible.
+
+`Content-Security-Policy` controls which scripts can run on the page. If this header is missing, XSS attacks become much easier.
+
+`X-Content-Type-Options` prevents MIME type sniffing. If this header is missing, certain file upload attacks work.
+
+### Caching Headers
+
+`Cache-Control`, `ETag`, and `Expires` tell you how the server stores content. Misconfigured caching can lead to cache poisoning. You can trick the server into storing your malicious content and serving it to other users.
+
+### CORS Headers
+
+`Access-Control-Allow-Origin` tells you which websites can read this data. If it is set to `*` and credentials are allowed, any website can steal information from authenticated users.
+
+### Content Information
+
+`Content-Type` tells you what kind of response this is. HTML, JSON, XML, PDF, or an image. You know what to expect before downloading anything.
+
+`Content-Length` tells you the size of the response in bytes. A large number means a big page. A tiny number might be an error message or a redirect.
+
+### Redirect Information
+
+The `Location` header appears when the server redirects you. It shows the exact destination URL. Sometimes this reveals internal hostnames or staging servers that were never meant to be public.
+
+---
+
+## What You Do Not Get.
+
+The `-I` flag deliberately skips the response body. You do not receive the HTML source code. You cannot see what the page actually looks like. You cannot read any text content. You cannot find comments left by developers. You cannot see hidden form fields. You cannot extract JavaScript files or API endpoints from the page. You cannot find email addresses. You cannot download any files.
+
+For all of that, you need a normal GET request. Just `curl https://target.com` without the `-I` flag.
+
+---
+
+## How To Use This Information.
+
+Start every reconnaissance session with `curl -I`. Check the status code first. If it is 404, move on. If it is 200, dig deeper.
+
+Look at the Server and X-Powered-By headers. Write down every version number you find. Google each one with the word "exploit" or "CVE". An outdated PHP version means dozens of unpatched vulnerabilities. An outdated Apache version means public proof of concept code is already available.
+
+Check the security headers. Every missing header is a potential attack vector. No HSTS means try SSL stripping. No X-Frame-Options means try clickjacking. No CSP means XSS is wide open.
+
+Read the Set-Cookie headers carefully. Missing HttpOnly means cookie theft via XSS. Missing Secure means man in the middle attacks. Missing SameSite means CSRF.
+
+If you see a Location header, visit that URL. It might lead to an internal server or a debug page that was never meant to be public.
+
+---
+
+## Quick Reference Table.
+
+| Header | What It Reveals |
+|--------|-----------------|
+| HTTP Status Code | Page exists? Redirected? Protected? Broken? |
+| Server | Web server type and version |
+| X-Powered-By | Programming language and version |
+| Set-Cookie | Session management and security flags |
+| Strict-Transport-Security | HTTPS enforcement |
+| X-Frame-Options | Clickjacking protection |
+| Content-Security-Policy | XSS and script control |
+| X-Content-Type-Options | MIME sniffing protection |
+| Cache-Control | Caching rules |
+| Access-Control-Allow-Origin | Cross-origin access rules |
+| Location | Redirect destination |
+| Content-Type | Type of response (HTML, JSON, etc.) |
+| Content-Length | Size of response in bytes |
+
+---
+
+## One Last Thing.
+
+`curl -I` is a head request. It is fast. It is silent. It does not download anything large. It gives you the blueprint of the server before you even touch the front door.
+
+Use it first. Use it always. Let the headers guide your next move.
