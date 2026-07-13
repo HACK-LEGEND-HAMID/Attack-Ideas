@@ -315,8 +315,225 @@ If you see a Location header, visit that URL. It might lead to an internal serve
 
 ---
 
-## One Last Thing.
+# curl -H. Speak With Someone Else's Voice.
 
-`curl -I` is a head request. It is fast. It is silent. It does not download anything large. It gives you the blueprint of the server before you even touch the front door.
+`curl -H` lets you add custom headers to your request. Headers are extra information you send to the server. They tell the server who you are, what you want, and how you want it.
 
-Use it first. Use it always. Let the headers guide your next move.
+Think of headers like labels on a package. The box stays the same. But one label says **Fragile**. Another says **Express Delivery**. Another says **Confidential**. Each label tells the handler something different. The package inside does not change. The treatment it gets does.
+
+---
+
+## What Is A Header
+
+Every time you visit a website, your browser sends headers automatically. It sends your browser name. It sends your preferred language. It sends what type of data you can accept. You never see these headers. But the server reads every single one.
+
+With `curl -H`, you take control. You decide what headers to send. You can pretend to be a different browser. You can pretend to be an admin. You can pretend to be coming from a different website. You can send information the server never expected.
+
+---
+
+## The Basic Syntax
+
+```bash
+curl -H "Header-Name: Header-Value" https://target.com
+```
+
+The `-H` flag stands for **Header**. After it, you write the header name, a colon, and the header value. All inside quotes.
+
+You can use as many `-H` flags as you want. Each one adds another header to your request.
+
+```bash
+curl -H "User-Agent: MyBrowser" -H "X-Role: Admin" https://target.com
+```
+
+---
+
+## Headers That Change Your Identity
+
+### User-Agent
+
+The `User-Agent` header tells the server which browser you are using. By default, curl sends `curl/8.18.0`. The server immediately knows you are not using a real browser. Some websites block curl requests entirely. You can bypass this.
+
+```bash
+curl -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" https://target.com
+```
+
+Now the server thinks you are Firefox on Windows. The blocking never triggers.
+
+### Referer
+
+The `Referer` header tells the server which page you came from. Some websites check this. They only allow access if you came from a specific page.
+
+```bash
+curl -H "Referer: https://target.com/admin/login" https://target.com/admin/dashboard
+```
+
+The server thinks you clicked a link on the admin login page to reach the dashboard.
+
+### Origin
+
+The `Origin` header tells the server which website initiated the request. APIs use this for CORS validation.
+
+```bash
+curl -H "Origin: https://target.com" https://api.target.com/data
+```
+
+---
+
+## Headers That Change Your Role
+
+Some applications use custom headers for internal logic. Developers create these headers for specific purposes. Sometimes they forget to remove them from production code.
+
+### X-Forwarded-For
+
+This header tells the server the original IP address of the client. Some servers trust this header blindly. If you send `127.0.0.1`, the server thinks you are on the same machine. Localhost often has full access.
+
+```bash
+curl -H "X-Forwarded-For: 127.0.0.1" https://target.com/admin
+```
+
+### X-Role and X-Admin
+
+Some applications use custom headers for permissions. An `X-Role` header might tell the server what permissions you have. An `X-Admin` header might bypass authentication entirely.
+
+```bash
+curl -H "X-Role: admin" https://target.com/dashboard
+curl -H "X-Admin: true" https://target.com/admin
+```
+
+### X-Original-URL and X-Rewrite-URL
+
+These headers are used by reverse proxies. They tell the backend server what the original URL was. Some servers trust these headers. You can use them to access blocked paths.
+
+```bash
+curl -H "X-Original-URL: /admin" https://target.com/blocked
+curl -H "X-Rewrite-URL: /admin" https://target.com/dashboard
+```
+
+---
+
+## Headers That Change The Content
+
+### Content-Type
+
+The `Content-Type` header tells the server what kind of data you are sending. When you submit JSON data, you must set this header. Otherwise the server might not parse your request correctly.
+
+```bash
+curl -X POST https://api.target.com/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"test123"}'
+```
+
+Without this header, the server might treat your JSON as plain text. It might reject your request. Or it might parse it incorrectly.
+
+### Accept
+
+The `Accept` header tells the server what type of response you want back.
+
+```bash
+curl -H "Accept: application/json" https://target.com/api/data
+```
+
+---
+
+## Headers That Carry Authentication
+
+### Authorization
+
+The `Authorization` header carries credentials. When a site uses Bearer tokens or Basic authentication, this is where they go.
+
+```bash
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.xxx" https://api.target.com/admin
+curl -H "Authorization: Basic dXNlcjpwYXNz" https://target.com/protected
+```
+
+### Cookie
+
+The `Cookie` header sends session cookies. You can steal a cookie and use it directly without logging in.
+
+```bash
+curl -H "Cookie: session=abc123def456" https://target.com/admin
+```
+
+### X-API-Key
+
+Some APIs use custom headers for authentication. An `X-API-Key` header might be all you need.
+
+```bash
+curl -H "X-API-Key: sk-1234567890" https://api.target.com/data
+```
+
+---
+
+## Real Attack Scenarios
+
+### Bypassing IP Restrictions
+
+A website blocks everyone except internal IP addresses. You can try to fake your IP using headers.
+
+```bash
+curl -H "X-Forwarded-For: 192.168.1.1" https://target.com/internal
+curl -H "X-Real-IP: 10.0.0.1" https://target.com/internal
+curl -H "Client-IP: 127.0.0.1" https://target.com/internal
+```
+
+### Accessing Admin Panel
+
+The admin panel is hidden and protected. You can try role headers to bypass the protection.
+
+```bash
+curl -H "X-Role: admin" https://target.com/admin
+curl -H "X-Admin: true" https://target.com/admin
+curl -H "X-Auth-Role: superuser" https://target.com/admin
+```
+
+### API Without Authentication
+
+An API requires an API key. You found a key in the JavaScript source code. Now you use it.
+
+```bash
+curl -H "X-API-Key: sk_test_123456" https://api.target.com/users
+```
+
+### Cache Poisoning
+
+You can inject headers that get cached and served to other users.
+
+```bash
+curl -H "X-Forwarded-Host: evil.com" https://target.com
+```
+
+If the server reflects this header in cached responses, every user will get links pointing to `evil.com`.
+
+---
+
+## Quick Reference
+
+| Header | Purpose |
+|--------|---------|
+| `User-Agent` | Fake your browser identity |
+| `Referer` | Fake where you came from |
+| `Origin` | Fake which site initiated the request |
+| `X-Forwarded-For` | Fake your IP address |
+| `X-Role` | Fake your role or permissions |
+| `Content-Type` | Tell the server what format your data is |
+| `Accept` | Tell the server what format you want back |
+| `Authorization` | Send credentials and tokens |
+| `Cookie` | Send session cookies |
+| `X-API-Key` | Send API authentication keys |
+| `Cache-Control` | Control caching behavior |
+| `X-Original-URL` | Bypass URL restrictions |
+| `X-Forwarded-Host` | Poison caches |
+
+---
+
+## How To Practice
+
+The best way to learn headers is to see what you are sending. Use a service that echoes your request back to you.
+
+```bash
+curl -H "X-Custom: HelloWorld" https://postman-echo.com/get
+curl -H "User-Agent: TheRebel" https://httpbin.org/headers
+```
+
+These services show you exactly what headers the server received. You can see the immediate effect of your `-H` flag.
+
