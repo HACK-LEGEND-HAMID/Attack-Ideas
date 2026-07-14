@@ -537,3 +537,155 @@ curl -H "User-Agent: TheRebel" https://httpbin.org/headers
 
 These services show you exactly what headers the server received. You can see the immediate effect of your `-H` flag.
 
+# curl -v. See Everything. Hide Nothing.
+
+`curl -v` turns on verbose mode. It shows you the entire conversation between your terminal and the server. Every line. Every header. Every handshake. Nothing stays hidden.
+
+Without `-v`, you see only the final response. It is like ordering food and only seeing the plate that arrives. With `-v`, you see the kitchen. You see the chef taking your order. You see the ingredients being picked. You see exactly how the meal was made.
+
+---
+
+## What -v Actually Does
+
+When you add `-v` to any curl command, three new types of output appear.
+
+Lines starting with `*` are connection details. These are curl talking to itself, telling you what is happening behind the scenes. DNS resolution. TCP connection. TLS handshake. Certificate verification. Every step of the journey from your terminal to the server.
+
+Lines starting with `>` are your request headers. These are the exact headers curl is sending on your behalf. Every `-H` flag you added appears here. Every default header curl sends automatically appears here. You see exactly what the server sees.
+
+Lines starting with `<` are the response headers from the server. Status code. Server type. Cookies being set. Cache rules. Security policies. Everything the server wants you to know before you even see the body.
+
+---
+
+## The Basic Command
+
+```bash
+curl -v https://example.com
+```
+
+The output will look something like this.
+
+```
+*   Trying 93.184.215.14:443...
+*   Connected to example.com (93.184.215.14) port 443
+*   ALPN: curl offers h2,http/1.1
+*   TLSv1.3, TLS handshake, Client hello (1):
+*   TLSv1.3, TLS handshake, Server hello (2):
+*   TLS certificate verified ok
+>   GET / HTTP/1.1
+>   Host: example.com
+>   User-Agent: curl/8.18.0
+>   Accept: */*
+>
+<   HTTP/1.1 200 OK
+<   Content-Type: text/html; charset=UTF-8
+<   Server: ECS (dce/26CE)
+<   Content-Length: 1256
+<
+...response body here...
+```
+
+Every single step of the request is visible. Nothing is hidden from you.
+
+---
+
+## Understanding The Three Symbols
+
+The `*` symbol marks connection information. This is the transport layer. TCP sockets. TLS certificates. IP addresses. If something goes wrong at this level, the server never even sees your request. You need this output to debug connectivity issues.
+
+The `>` symbol marks your outgoing request. These are the headers you are sending. The method. The path. The host. Your user agent. Any cookies. Any custom headers you added with `-H`. This is what the server reads when it receives your request.
+
+The `<` symbol marks the incoming response. These are the headers the server sends back. The status code. The content type. Any cookies being set. Security headers like HSTS and CSP. This is the server's first reply before the actual content.
+
+---
+
+## Why You Need -v
+
+### When An Attack Fails
+
+You try a header injection. You send `X-Forwarded-For: 127.0.0.1`. The response looks the same as before. Without `-v`, you assume the server ignored your header.
+
+With `-v`, you see the truth. Maybe Cloudflare stripped your header before it reached the origin server. Maybe the server received it but the application code ignored it. Maybe you typed the header name wrong and it was never sent. `-v` shows you exactly what was transmitted.
+
+### When A Redirect Is Confusing
+
+You request `/admin` and get a login page. Without `-v`, you just see the login form HTML. You do not know if you were redirected or if the page simply serves a login form to unauthenticated users.
+
+With `-v`, you see the `302 Found` status code and the `Location: /login` header. Now you know for certain. The admin page exists. It redirects to login. This is valuable reconnaissance information.
+
+### When SSL Fails
+
+You try to connect to a site and curl shows an SSL error. Without `-v`, the error message is generic. "SSL certificate problem."
+
+With `-v`, you see the entire certificate chain. You see which certificate expired. You see whether the hostname matches. You see the exact TLS version negotiated. This information helps you understand whether the server is misconfigured or whether you are being man-in-the-middled.
+
+### When You Are Learning
+
+You want to understand what headers a browser sends versus what curl sends. You run `curl -v https://httpbin.org/get` and study the `>` lines. You see `User-Agent: curl/8.18.0`. You see `Accept: */*`.
+
+Now you know what to change when you want to look like a real browser. You add `-H "User-Agent: Mozilla/5.0"` and `-H "Accept: text/html"`. You run `-v` again and verify the headers changed. This is how you learn. By seeing. By comparing.
+
+---
+
+## Practical Commands To Try
+
+See what a normal request looks like. Study the default headers curl sends.
+
+```bash
+curl -v https://postman-echo.com/get
+```
+
+See what happens when you add custom headers. Confirm they were actually sent.
+
+```bash
+curl -v -H "X-Custom-Header: HelloWorld" https://postman-echo.com/get
+```
+
+See the full POST request including all headers and the body.
+
+```bash
+curl -v -X POST https://postman-echo.com/post -d "username=admin&password=test123"
+```
+
+See every step of a redirect chain.
+
+```bash
+curl -v -L https://github.com
+```
+
+See SSL certificate details for any site. Check expiry dates and issuers.
+
+```bash
+curl -v https://expired.badssl.com/ 2>&1 | grep -E "expire|subject|issuer|start"
+```
+
+---
+
+## -v vs Other Output Flags
+
+| Flag | Request Headers | Response Headers | Response Body | Connection Info |
+|------|-----------------|-------------------|---------------|-----------------|
+| No flag | Hidden | Hidden | Visible | Hidden |
+| `-I` | Hidden | Visible | Hidden | Hidden |
+| `-v` | **Visible** | **Visible** | Visible | **Visible** |
+| `-i` | Hidden | Visible | Visible | Hidden |
+
+`-v` is the only flag that shows everything. Request headers. Response headers. Connection details. Response body. Nothing is omitted.
+
+---
+
+## When To Use -v
+
+Use `-v` when you are developing an attack and it does not work. Use `-v` when you want to see what headers a server expects. Use `-v` when you are troubleshooting SSL errors. Use `-v` when you are learning and want to understand what happens under the hood.
+
+Do not use `-v` when you are running a script that processes the response body. The extra output will interfere with parsing. Do not use `-v` when you only care about the final result. It adds noise you do not need.
+
+---
+
+## What -v Cannot Do
+
+`-v` does not find vulnerabilities on its own. It is a diagnostic tool, not an attack tool. It shows you what happened, not what could happen. It helps you understand failures, but it does not cause them.
+
+The vulnerability is not in the output of `-v`. The vulnerability is in what you learn from studying that output. A missing security header. An outdated server version. A cookie without the Secure flag. `-v` reveals these. You must recognize them.
+
+
