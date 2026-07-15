@@ -688,4 +688,136 @@ Do not use `-v` when you are running a script that processes the response body. 
 
 The vulnerability is not in the output of `-v`. The vulnerability is in what you learn from studying that output. A missing security header. An outdated server version. A cookie without the Secure flag. `-v` reveals these. You must recognize them.
 
+# curl -L. Follow The Trail.
+
+`curl -L` follows redirects. When a server says "go here instead", `-L` actually goes there. Without `-L`, curl just tells you where you would be sent. With `-L`, curl makes the journey and brings back whatever is at the destination.
+
+---
+
+## What Is A Redirect
+
+A redirect is like a sign on a shop door. The sign says "We moved. New address: Third house, next street." You read the sign. You go to the new address. That is a redirect.
+
+Servers send a 301 or 302 status code. Along with a `Location` header that contains the new URL. Browsers follow this automatically. Curl does not follow unless you use `-L`.
+
+---
+
+## Basic Commands
+
+```bash
+# Follow a redirect to the final page
+curl -L https://github.com
+
+# Follow at most 3 redirects, then stop
+curl -L --max-redirs 3 https://target.com
+
+# Follow and see every step
+curl -v -L https://bit.ly/shortlink
+
+# Without -L — only see the redirect, do not follow
+curl -I https://short.link
+```
+
+---
+
+## How To Find Vulnerabilities With -L
+
+### Open Redirect
+
+If the server redirects you to any external URL you give it, that is an Open Redirect. Attackers use this for phishing. The link looks like the real site. But it sends victims somewhere else.
+
+```bash
+curl -I "https://target.com/login?redirect=https://evil.com"
+```
+
+If the response contains `Location: https://evil.com`, the vulnerability is confirmed. The server will send anyone who clicks this link to `evil.com`.
+
+### SSRF via Redirect
+
+If the server follows redirects to internal addresses, you can access services that are not exposed to the internet. Cloud metadata. Internal APIs. Database endpoints.
+
+```bash
+curl -L "https://target.com/fetch?url=http://169.254.169.254/"
+```
+
+If you get a response from the AWS metadata server, you can steal cloud credentials.
+
+### Redirect Bypass Techniques
+
+Some sites validate the redirect URL but not perfectly. You can try these bypasses.
+
+```bash
+# Double slash bypass
+curl -I "https://target.com/go?url=//evil.com"
+
+# Protocol relative bypass
+curl -I "https://target.com/go?url=https:evil.com"
+
+# URL encoded bypass
+curl -I "https://target.com/go?url=https%3A%2F%2Fevil.com"
+```
+
+---
+
+## Status Codes And What They Mean
+
+| Status | Name | What Happens |
+|--------|------|--------------|
+| 301 | Permanent Redirect | The page moved forever. Use the new URL from now on. |
+| 302 | Temporary Redirect | The page moved for now. Check the original URL next time. |
+| 303 | See Other | Always use GET for the next request. |
+| 307 | Temporary Redirect | Same as 302 but keep the same HTTP method. |
+| 308 | Permanent Redirect | Same as 301 but keep the same HTTP method. |
+
+`-L` follows all of these automatically.
+
+---
+
+## -L vs Without -L
+
+| Without -L | With -L |
+|------------|---------|
+| You see the 301 or 302 status | You get the final page content |
+| You see the Location header | You get the actual HTML |
+| You learn where the short link goes | You get what is at the destination |
+| You see the first step only | You reach the end of the journey |
+
+---
+
+## When To Use -L
+
+Use `-L` when you want to expand a short link and see the real URL.
+
+Use `-L` when you want to trace a redirect chain and see every step.
+
+Use `-L` when you are testing for Open Redirect vulnerabilities.
+
+Use `-L` when you are testing for SSRF through redirect chains.
+
+Use `-L` when you are mapping authentication flows. Login pages often redirect multiple times. Each redirect sets cookies or adds parameters.
+
+---
+
+## Pro Tips
+
+Combine `-L` with `-v` to see every redirect step.
+
+```bash
+curl -v -L https://target.com
+```
+
+Combine `-L` with `-I` to see only the headers at each step.
+
+```bash
+curl -I -L https://target.com
+```
+
+Set a maximum redirect limit to avoid infinite loops.
+
+```bash
+curl -L --max-redirs 5 https://target.com
+```
+
+
+
 
