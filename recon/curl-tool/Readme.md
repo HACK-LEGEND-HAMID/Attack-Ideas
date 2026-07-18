@@ -1212,5 +1212,138 @@ curl -X POST --data-urlencode "message=Hello & Welcome" https://target.com/submi
 
 
 
+# curl -k. Trust No Certificate.
 
+`curl -k` tells curl to skip SSL certificate verification. When a server presents an expired certificate, a self-signed certificate, or a certificate with the wrong hostname, curl normally rejects the connection. With `-k`, curl connects anyway. No questions asked.
+
+This is useful for testing. This is dangerous for everything else.
+
+---
+
+## What Is SSL Certificate Verification
+
+Every HTTPS connection begins with a handshake. The server shows its certificate. Curl checks it. Is it signed by a trusted authority? Has it expired? Does the hostname match? If any check fails, curl refuses to connect. This protects you from connecting to fake or compromised servers.
+
+`-k` disables all of these checks. Curl will connect to any server regardless of what its certificate says. Expired. Self-signed. Wrong hostname. Completely fake. Curl does not care.
+
+---
+
+## The Basic Command
+
+```bash
+curl -k https://expired.badssl.com/
+```
+
+Without `-k`, this command fails with an SSL error. The certificate on `expired.badssl.com` is deliberately expired. With `-k`, the page loads normally. Curl sees the expired certificate and shrugs.
+
+---
+
+## When SSL Errors Happen
+
+An SSL error can happen for several reasons. The certificate has passed its expiry date and the server administrator forgot to renew it. The certificate is self-signed and not issued by a trusted certificate authority — common on internal servers and development environments. The hostname on the certificate does not match the hostname you are connecting to — the certificate says `example.com` but you connected to `www.example.com`. The certificate chain is incomplete and a required intermediate certificate is missing.
+
+In all of these cases, `-k` makes the error go away by disabling the check entirely.
+
+---
+
+## Practical Examples
+
+### Expired Certificate
+
+A production site whose certificate expired yesterday. You need to access it for testing. The administrator is working on renewal but you cannot wait.
+
+```bash
+curl -k https://expired.badssl.com/
+```
+
+### Self-Signed Certificate
+
+An internal development server that uses a self-signed certificate. It was never meant to be accessed over the public internet. Curl refuses the connection because the certificate authority is not recognized.
+
+```bash
+curl -k https://localhost:8443/admin
+curl -k https://192.168.1.100/dashboard
+```
+
+### Wrong Hostname
+
+A server configured with a certificate for `example.com` but you are accessing it via its IP address or a different domain name. The certificate does not match. The connection is rejected.
+
+```bash
+curl -k https://192.168.0.50/login
+```
+
+### Debugging SSL Problems
+
+You are investigating an SSL configuration issue. You need to see the full response despite the certificate problem.
+
+```bash
+curl -k -v https://problematic-server.com
+```
+
+---
+
+## Practice With Badssl
+
+Badssl.com provides deliberately broken SSL configurations for testing. Each subdomain demonstrates a different certificate problem.
+
+```bash
+# Expired certificate
+curl -k https://expired.badssl.com/
+
+# Self-signed certificate
+curl -k https://self-signed.badssl.com/
+
+# Wrong hostname
+curl -k https://wrong.host.badssl.com/
+
+# Untrusted root certificate
+curl -k https://untrusted-root.badssl.com/
+
+# Incomplete certificate chain
+curl -k https://incomplete-chain.badssl.com/
+```
+
+Each of these will fail without `-k` and succeed with it.
+
+---
+
+## The Danger
+
+`-k` disables the primary mechanism that protects you from man-in-the-middle attacks. When you use `-k`, you lose the ability to verify that the server you are talking to is the real server and not an attacker pretending to be it.
+
+If an attacker sits between you and the server, they can present a fake certificate. Without `-k`, curl detects this and refuses to connect. With `-k`, curl connects and sends your data directly to the attacker. Your passwords. Your session tokens. Your API keys. Everything.
+
+Never use `-k` with sensitive data. Never use `-k` on banking sites. Never use `-k` on payment gateways. Never use `-k` when entering passwords or personal information.
+
+---
+
+## Safe Uses
+
+Use `-k` on local development servers that you control. Use `-k` on internal network devices that use self-signed certificates. Use `-k` for penetration testing when you have explicit permission from the server owner. Use `-k` for security research on deliberately broken SSL configurations like badssl.com.
+
+Do not use `-k` on any production website that handles real user data. Do not use `-k` as a permanent solution for SSL errors. If a certificate is broken, fix it. Do not make `-k` a habit.
+
+---
+
+## Alternatives To -k
+
+Instead of using `-k` globally, use `--cacert` to specify a specific certificate authority file that you trust.
+
+```bash
+curl --cacert /path/to/custom-ca.crt https://internal-server.com
+```
+
+This adds your custom CA to the trust store without disabling verification entirely. It is more secure than `-k` because curl still verifies the certificate against a known authority.
+
+---
+
+## Quick Reference
+
+| Command | What It Does |
+|---------|--------------|
+| `curl -k URL` | Skip all SSL verification |
+| `curl -k -v URL` | Skip verification and show details |
+| `curl --cacert ca.crt URL` | Add custom CA, verify normally |
+| `curl --insecure URL` | Same as `-k` (long form) |
 
