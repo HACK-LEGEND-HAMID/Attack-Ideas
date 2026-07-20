@@ -1347,3 +1347,284 @@ This adds your custom CA to the trust store without disabling verification entir
 | `curl --cacert ca.crt URL` | Add custom CA, verify normally |
 | `curl --insecure URL` | Same as `-k` (long form) |
 
+# Tor + CURL. Anonymous Reconnaissance.
+
+Tor hides your real IP address. Curl sends requests. Together they let you perform reconnaissance and testing without revealing who you are or where you are located.
+
+This guide covers everything. Installing Tor. Starting Tor. Using Tor with Curl. Fixing common errors. Bypassing geo-blocks. And staying safe while testing.
+
+---
+
+## Why Tor Matters For Pentesting
+
+Every request you send from your terminal carries your real IP address. The target server logs it. Cloudflare logs it. Your ISP logs it. If you are testing without permission, that IP address leads directly back to you.
+
+Tor routes your traffic through three random nodes around the world. The target server sees the IP of the last node — the exit relay — not your real IP. Your ISP sees you connected to Tor, but cannot see what you are doing. The target sees a request from some random country, but cannot trace it back to you.
+
+This is not a license to attack without permission. This is a safety layer for legitimate security testing. Always have authorization before testing any system you do not own.
+
+---
+
+## Installing Tor
+
+### Linux (Debian/Ubuntu)
+```bash
+sudo apt update
+sudo apt install tor -y
+```
+
+### Linux (Fedora)
+```bash
+sudo dnf install tor -y
+```
+
+### Termux (Android)
+```bash
+pkg install tor -y
+```
+
+### macOS
+```bash
+brew install tor
+```
+
+---
+
+## Starting Tor
+
+The simplest way to start Tor is in the background.
+
+```bash
+tor &
+```
+
+Wait about ten seconds for Tor to establish a circuit. You will see output similar to this when it is ready.
+
+```
+[notice] Tor has successfully opened a circuit.
+```
+
+If you see this line, Tor is connected and ready to use.
+
+To stop Tor, run:
+
+```bash
+sudo killall tor
+```
+
+---
+
+## Checking If Tor Is Running
+
+Three ways to verify Tor is active.
+
+### Port Check
+```bash
+ss -tlnp | grep 9050
+```
+If port 9050 is in the LISTEN state, Tor is running. If the output is empty, Tor is not running.
+
+### Process Check
+```bash
+ps aux | grep -v grep | grep tor
+```
+If you see the tor process, it is active.
+
+### One-Liner Status
+```bash
+ss -tlnp | grep -q 9050 && echo "TOR IS ON" || echo "TOR IS OFF"
+```
+
+---
+
+## Using Tor With Curl
+
+Once Tor is running, route your curl requests through it using the SOCKS5 proxy flag.
+
+```bash
+curl --socks5 127.0.0.1:9050 https://check.torproject.org/
+```
+
+The response should contain the words "Congratulations. This browser is configured to use Tor." Your IP address shown on the page will be a Tor exit node IP, not your real IP.
+
+For everyday use, create a shortcut.
+
+```bash
+alias torcurl='curl --socks5 127.0.0.1:9050'
+torcurl https://target.com
+```
+
+---
+
+## Verifying Your Anonymity
+
+Always verify that Tor is working before testing any target.
+
+```bash
+curl --socks5 127.0.0.1:9050 -s https://check.torproject.org/ | grep -o "Congratulations\|Sorry"
+```
+
+If the output is "Congratulations", you are anonymous. If the output is "Sorry" or empty, Tor is not routing your traffic.
+
+Also check what IP the target sees.
+
+```bash
+curl --socks5 127.0.0.1:9050 -s https://api.ipify.org/
+```
+
+Compare this with your real IP.
+
+```bash
+curl -s https://api.ipify.org/
+```
+
+These two IPs must be different. If they are the same, Tor is not working.
+
+---
+
+## Common Errors And Fixes
+
+### Error: Permission denied on /run/tor
+```
+[warn] Directory /run/tor cannot be read: Permission denied
+```
+**Fix:** Create the directory and assign ownership to your user.
+```bash
+sudo mkdir -p /run/tor
+sudo chown $USER:$USER /run/tor
+tor &
+```
+
+### Error: Could not connect to server via 127.0.0.1
+```
+curl: (7) Failed to connect to target.com port 443 via 127.0.0.1: Could not connect to server
+```
+**Fix:** Tor is not running. Start it first.
+```bash
+tor &
+sleep 10
+```
+
+### Error: Tor exits immediately
+```
+[err] Reading config failed
+```
+**Fix:** Kill any existing Tor processes and try again.
+```bash
+sudo killall tor
+tor &
+```
+
+### Tor runs but curl hangs
+**Fix:** Wait longer for the circuit to establish. Tor can take 10 to 30 seconds on the first run.
+```bash
+tor &
+sleep 15
+curl --socks5 127.0.0.1:9050 https://check.torproject.org/
+```
+
+---
+
+## Bypassing Geo-Blocks
+
+Some websites block visitors from specific countries. If you are in Pakistan and trying to access a site that blocks Pakistani IPs, Tor helps.
+
+```bash
+curl --socks5 127.0.0.1:9050 https://geo-blocked-site.com
+```
+
+The target server sees the IP of the Tor exit node, which could be in Germany, the United States, or any other country. The geo-block never triggers.
+
+To get an exit node from a specific country, configure Tor to use only exit nodes from that country. Edit the Tor configuration file.
+
+```bash
+sudo nano /etc/tor/torrc
+```
+
+Add these lines.
+
+```
+ExitNodes {us}
+StrictNodes 1
+```
+
+Restart Tor.
+
+```bash
+sudo killall tor
+tor &
+```
+
+Now all your traffic will exit through United States nodes.
+
+---
+
+## Other Uses Of Tor
+
+### Downloading Files Anonymously
+
+```bash
+curl --socks5 127.0.0.1:9050 -O https://target.com/file.pdf
+```
+
+### Anonymous API Testing
+
+```bash
+curl --socks5 127.0.0.1:9050 -X POST -H "Content-Type: application/json" -d '{"key":"value"}' https://api.target.com/endpoint
+```
+
+### Reconnaissance Without Leaving Footprints
+
+```bash
+curl --socks5 127.0.0.1:9050 -s https://target.com | grep -oP '<!--.*?-->|href="\K[^"]*'
+```
+
+### Checking Dark Web .onion Sites
+
+```bash
+curl --socks5 127.0.0.1:9050 http://example.onion/
+```
+
+---
+
+## Auto-Starting Tor On Boot
+
+If you want Tor to start automatically every time your system boots, enable the systemd service.
+
+```bash
+sudo systemctl enable tor
+sudo systemctl start tor
+```
+
+Check the status.
+
+```bash
+sudo systemctl status tor
+```
+
+---
+
+## Important Warnings
+
+Tor hides your IP address. It does not make illegal activity legal. Always have written permission before testing any system you do not own.
+
+Tor slows down your connection. Each request travels through three random nodes around the world. This adds latency. Expect response times of several seconds for each request.
+
+Tor exit nodes can see your traffic if it is not encrypted. Always use HTTPS with Tor. The exit node can see unencrypted HTTP traffic. With HTTPS, the exit node only sees the domain name, not the full URL or any data.
+
+Your ISP can see that you are using Tor. They cannot see what you are doing, but they know you are connected to the Tor network. In some countries, this alone raises suspicion. Know the laws in your country.
+
+---
+
+## Quick Reference
+
+| Task | Command |
+|------|---------|
+| Start Tor | `tor &` |
+| Stop Tor | `sudo killall tor` |
+| Check if running | `ss -tlnp \| grep 9050` |
+| Use with curl | `curl --socks5 127.0.0.1:9050 URL` |
+| Check anonymity | `curl --socks5 127.0.0.1:9050 https://check.torproject.org/` |
+| See exit node IP | `curl --socks5 127.0.0.1:9050 https://api.ipify.org/` |
+| Auto-start on boot | `sudo systemctl enable tor` |
+
