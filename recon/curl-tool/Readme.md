@@ -1628,3 +1628,139 @@ Your ISP can see that you are using Tor. They cannot see what you are doing, but
 | See exit node IP | `curl --socks5 127.0.0.1:9050 https://api.ipify.org/` |
 | Auto-start on boot | `sudo systemctl enable tor` |
 
+# curl -A. Tell The Server Who You Are.
+
+`curl -A` sets your User-Agent header. It tells the server which browser you are using. In one short flag, you can pretend to be Chrome on Windows, Safari on iPhone, or a Google crawler.
+
+The server reads your User-Agent and decides how to treat you. Some servers show different content to different browsers. Some block curl entirely. Some allow Googlebot special access. `-A` gives you control over this.
+
+---
+
+## The Default User-Agent
+
+When you run curl without any headers, it sends its own name.
+
+```bash
+curl https://httpbin.org/headers
+```
+
+The response shows:
+
+```json
+{
+  "headers": {
+    "User-Agent": "curl/8.18.0"
+  }
+}
+```
+
+Every server knows you are using curl. If the server blocks curl, you get nothing.
+
+---
+
+## Changing Your Identity
+
+The `-A` flag replaces the default User-Agent with whatever you want.
+
+```bash
+curl -A "Mozilla/5.0" https://httpbin.org/headers
+```
+
+Now the server sees `Mozilla/5.0` instead of `curl/8.18.0`. It thinks you are a real browser.
+
+You can be anyone.
+
+---
+
+## Common User-Agents
+
+### Chrome on Windows
+```bash
+curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" https://target.com
+```
+
+### Firefox on Windows
+```bash
+curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0" https://target.com
+```
+
+### Safari on iPhone
+```bash
+curl -A "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1" https://target.com
+```
+
+### Googlebot
+```bash
+curl -A "Googlebot/2.1 (+http://www.google.com/bot.html)" https://target.com
+```
+
+---
+
+## When To Use Different Identities
+
+### Bypassing Curl Blocks
+
+Some servers reject requests from curl. They check the User-Agent and return a 403 Forbidden or an empty response. Changing to a browser User-Agent bypasses this instantly.
+
+```bash
+curl -A "Mozilla/5.0" https://curl-blocked-site.com
+```
+
+### Accessing Mobile Content
+
+Some websites serve different pages to mobile and desktop users. A mobile User-Agent gives you the mobile version.
+
+```bash
+curl -A "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X)" https://target.com
+```
+
+### Crawling With Special Access
+
+Googlebot and other crawlers sometimes get access to paywalled or restricted content that normal users cannot see.
+
+```bash
+curl -A "Googlebot/2.1" https://paywalled-site.com/article
+```
+
+---
+
+## -A vs -H
+
+Both of these do the same thing.
+
+```bash
+curl -A "Mozilla/5.0" https://target.com
+curl -H "User-Agent: Mozilla/5.0" https://target.com
+```
+
+`-A` is simply shorter. Use whichever you prefer. The result is identical.
+
+---
+
+## What -A Cannot Do
+
+`-A` only changes one header. If the server checks other headers like Accept, Accept-Language, or Accept-Encoding, you need additional `-H` flags. If the server uses JavaScript challenges like Cloudflare, no User-Agent will help. You need a real browser.
+
+`-A` changes how you look. It does not change where you are. Your IP address remains the same. For anonymity, use Tor or a VPN.
+
+---
+
+## Practice Commands
+
+```bash
+# See your current User-Agent
+curl https://httpbin.org/headers
+
+# Change it
+curl -A "MyCustomBrowser/1.0" https://httpbin.org/headers
+
+# Test with a real browser identity
+curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" https://httpbin.org/headers
+
+# Try Googlebot on a paywalled site
+curl -A "Googlebot/2.1" https://target.com/premium-content
+```
+
+---
+
+
